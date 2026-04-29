@@ -23,8 +23,8 @@ from tradingagents.dataflows.india_report import generate_report
 
 def build_config(ticker_ns: str) -> dict:
     config = DEFAULT_CONFIG.copy()
-    config["llm_provider"] = "openrouter"
-    config["backend_url"] = "https://api.clod.io/v1"
+    config["llm_provider"] = "clodio"
+    config["backend_url"] = None
     config["deep_think_llm"] = "deepseek-ai/DeepSeek-V4-Pro"
     config["quick_think_llm"] = "deepseek-ai/DeepSeek-V4-Pro"
     config["max_debate_rounds"] = 1
