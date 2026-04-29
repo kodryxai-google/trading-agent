@@ -1,0 +1,7 @@
+reports/
+.env
+temp_clone/
+__pycache__/
+*.pyc
+.tradingagents/
+*.egg-info/
