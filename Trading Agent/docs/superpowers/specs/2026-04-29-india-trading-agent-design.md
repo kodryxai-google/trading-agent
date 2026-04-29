@@ -114,10 +114,12 @@ All agent files, graph files, LLM clients, CLI — no changes.
   ```
 
 ### `india_reddit.py`
-- Uses PRAW (Python Reddit API Wrapper)
-- Searches `r/IndiaInvestments` + `r/IndianStockMarket` for posts mentioning the ticker
-- Fetches top 20 posts from last 7 days, top 3 comments per post
-- Credentials from `.env`: `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT`
+- Uses Reddit public JSON endpoints — **no API key or authentication required**
+- Endpoint: `https://www.reddit.com/r/{subreddit}/search.json?q={ticker}&sort=new&limit=25`
+- Subreddits: `IndiaInvestments` + `IndianStockMarket`
+- Sends a browser-like `User-Agent` header to avoid 429 rate limiting
+- Fetches up to 25 posts per subreddit from last 7 days, top 3 comments per post
+- No credentials needed — no `.env` entries required for Reddit
 - Returns sentiment summary: bullish/bearish post count + notable quotes
 
 ### `india_report.py`
@@ -194,10 +196,7 @@ Output:
 # LLM
 OPENROUTER_API_KEY=eyJhbGci...  # clod.io key goes here
 
-# Reddit (PRAW)
-REDDIT_CLIENT_ID=
-REDDIT_CLIENT_SECRET=
-REDDIT_USER_AGENT=IndiaStockAgent/1.0
+# Reddit — no credentials needed (uses public JSON endpoints)
 
 # Optional overrides
 TRADINGAGENTS_RESULTS_DIR=./reports
