@@ -7,7 +7,11 @@ import functools
 from langchain_core.messages import AIMessage
 
 from tradingagents.agents.schemas import TraderProposal, render_trader_proposal
-from tradingagents.agents.utils.agent_utils import build_instrument_context
+from tradingagents.agents.utils.agent_utils import build_instrument_context, get_professional_rules
+from tradingagents.agents.utils.confidence import (
+    infer_factors_from_reports,
+    compute_confidence,
+)
 from tradingagents.agents.utils.structured import (
     bind_structured,
     invoke_structured_or_freetext,
@@ -22,13 +26,24 @@ def create_trader(llm):
         instrument_context = build_instrument_context(company_name)
         investment_plan = state["investment_plan"]
 
+        # Infer confidence from analyst reports available in state
+        factors = infer_factors_from_reports(
+            market_report=state.get("market_report", ""),
+            news_report=state.get("news_report", ""),
+            fundamentals_report=state.get("fundamentals_report", ""),
+            anomaly_flags=state.get("data_anomalies", []),
+        )
+        confidence = compute_confidence(factors)
+
         messages = [
             {
                 "role": "system",
                 "content": (
-                    "You are a trading agent analyzing market data to make investment decisions. "
-                    "Based on your analysis, provide a specific recommendation to buy, sell, or hold. "
-                    "Anchor your reasoning in the analysts' reports and the research plan."
+                    "You are a professional institutional equity trader. "
+                    "Based on the research plan, provide a concrete transaction recommendation. "
+                    "Anchor your reasoning in the analysts' reports and the research plan. "
+                    f"Set confidence_score to {confidence} reflecting the signal quality. "
+                    + get_professional_rules()
                 ),
             },
             {
@@ -39,7 +54,8 @@ def create_trader(llm):
                     f"insights from current technical market trends, macroeconomic indicators, and "
                     f"social media sentiment. Use this plan as a foundation for evaluating your next "
                     f"trading decision.\n\nProposed Investment Plan: {investment_plan}\n\n"
-                    f"Leverage these insights to make an informed and strategic decision."
+                    f"Leverage these insights to make an informed and strategic decision. "
+                    f"Your confidence_score should be {confidence}."
                 ),
             },
         ]

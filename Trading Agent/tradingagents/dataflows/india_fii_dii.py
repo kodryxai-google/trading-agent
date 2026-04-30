@@ -45,7 +45,7 @@ def get_fii_dii_activity(
             if val is None:
                 return "N/A"
             sign = "+" if val >= 0 else ""
-            return f"{sign}₹{abs(val):,.2f} Cr"
+            return f"{sign}Rs.{abs(val):,.2f} Cr"
 
         def _action(val):
             if val is None:
@@ -55,10 +55,10 @@ def get_fii_dii_activity(
         result = f"## FII / DII Activity ({curr_date})\n\n"
         if fii_net is not None:
             result += f"**FII/FPI Net:** {_fmt(fii_net)} ({_action(fii_net)})\n"
-            result += f"  Buy: ₹{fii_buy:,.2f} Cr | Sell: ₹{fii_sell:,.2f} Cr\n\n"
+            result += f"  Buy: Rs.{fii_buy:,.2f} Cr | Sell: Rs.{fii_sell:,.2f} Cr\n\n"
         if dii_net is not None:
             result += f"**DII Net:** {_fmt(dii_net)} ({_action(dii_net)})\n"
-            result += f"  Buy: ₹{dii_buy:,.2f} Cr | Sell: ₹{dii_sell:,.2f} Cr\n\n"
+            result += f"  Buy: Rs.{dii_buy:,.2f} Cr | Sell: Rs.{dii_sell:,.2f} Cr\n\n"
 
         if fii_net is not None and dii_net is not None:
             if fii_net > 0 and dii_net > 0:

@@ -1,10 +1,30 @@
 from typing import Annotated
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+import logging
 import pandas as pd
 import yfinance as yf
 import os
 from .stockstats_utils import StockstatsUtils, _clean_dataframe, yf_retry, load_ohlcv, filter_financials_by_date
+from .data_validator import validate_ohlcv, format_anomaly_section
+from tradingagents.storage.db import TradingDB
+
+logger = logging.getLogger(__name__)
+
+# Module-level anomaly accumulator — reset each run via reset_anomaly_log()
+_anomaly_log: list[str] = []
+
+
+def reset_anomaly_log() -> None:
+    """Clear the module-level anomaly log at the start of each analysis run."""
+    global _anomaly_log
+    _anomaly_log = []
+
+
+def get_anomaly_log() -> list[str]:
+    """Return accumulated anomaly flags from the current run."""
+    return list(_anomaly_log)
+
 
 def get_YFin_data_online(
     symbol: Annotated[str, "ticker symbol of the company"],
@@ -31,6 +51,45 @@ def get_YFin_data_online(
     if data.index.tz is not None:
         data.index = data.index.tz_localize(None)
 
+    # Reset index so Date becomes a column for the validator
+    data = data.reset_index()
+
+    # --- Data sanity checks + anomaly detection --------------------------------
+    validation = validate_ohlcv(data, symbol=symbol.upper())
+    if validation.rejected_rows:
+        for w in validation.warnings:
+            logger.warning(w)
+    if validation.has_anomalies:
+        _anomaly_log.extend(validation.anomalies)
+        for a in validation.anomalies:
+            logger.warning(a)
+    data = validation.valid_df
+
+    # --- Persist to DuckDB (Layer 1) -------------------------------------------
+    try:
+        from tradingagents.dataflows.config import get_config
+        cfg = get_config()
+        db_path = cfg.get("db_path")
+        if db_path:
+            _df_for_db = data.copy()
+            if "Date" in _df_for_db.columns:
+                _df_for_db = _df_for_db.set_index("Date")
+            elif "date" in _df_for_db.columns:
+                _df_for_db = _df_for_db.set_index("date")
+            with TradingDB(db_path) as db:
+                db.upsert_ohlcv(symbol.upper(), _df_for_db)
+                if validation.anomalies:
+                    db.write_anomalies_bulk(symbol.upper(), end_date, validation.anomalies)
+    except Exception as _db_err:
+        logger.warning("DuckDB write skipped: %s", _db_err)
+    # ---------------------------------------------------------------------------
+
+    # Re-set Date as index for consistent CSV output
+    if "date" in data.columns:
+        data = data.set_index("date")
+    elif "Date" in data.columns:
+        data = data.set_index("Date")
+
     # Round numerical values to 2 decimal places for cleaner display
     numeric_columns = ["Open", "High", "Low", "Close", "Adj Close"]
     for col in numeric_columns:
@@ -43,8 +102,13 @@ def get_YFin_data_online(
     # Add header information
     header = f"# Stock data for {symbol.upper()} from {start_date} to {end_date}\n"
     header += f"# Total records: {len(data)}\n"
-    header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+    header += f"# Data retrieved on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
 
+    anomaly_section = format_anomaly_section(validation.anomalies)
+    if anomaly_section:
+        header += f"# {anomaly_section}\n"
+
+    header += "\n"
     return header + csv_string
 
 def get_stock_stats_indicators_window(

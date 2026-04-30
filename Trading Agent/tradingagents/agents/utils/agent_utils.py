@@ -20,6 +20,22 @@ from tradingagents.agents.utils.news_data_tools import (
 )
 
 
+PROFESSIONAL_ANALYST_RULES = """
+Professional conduct rules (mandatory):
+- NEVER reveal internal reasoning steps, uncertainty exploration, or chain-of-thought.
+- NEVER use phrases such as "I think", "maybe", "wait", "let me check", "I misread", "I'm not sure", or any language that exposes exploratory reasoning.
+- ONLY present final, validated conclusions supported by data.
+- If a data inconsistency exists, silently resolve it or flag it as: "Data inconsistency detected — treating conservatively."
+- If anomaly flags are present in the context, acknowledge them factually and adjust the recommendation accordingly.
+- All price levels, dates, and figures cited must come directly from the provided data — do not infer or hallucinate values.
+"""
+
+
+def get_professional_rules() -> str:
+    """Return the mandatory professional analyst conduct rules for injection into system prompts."""
+    return PROFESSIONAL_ANALYST_RULES.strip()
+
+
 def get_language_instruction() -> str:
     """Return a prompt instruction for the configured output language.
 

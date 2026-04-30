@@ -121,7 +121,18 @@ class TraderProposal(BaseModel):
     reasoning: str = Field(
         description=(
             "The case for this action, anchored in the analysts' reports and "
-            "the research plan. Two to four sentences."
+            "the research plan. Two to four sentences. Present only validated "
+            "conclusions — do not expose internal uncertainty or reasoning steps."
+        ),
+    )
+    confidence_score: int = Field(
+        default=50,
+        ge=0,
+        le=100,
+        description=(
+            "Integer 0-100 confidence in the recommendation. "
+            "80-100: High, 60-79: Moderate, 40-59: Weak, <40: Uncertain. "
+            "Deduct points for anomalies, data gaps, or conflicting signals."
         ),
     )
     entry_price: Optional[float] = Field(
@@ -145,8 +156,11 @@ def render_trader_proposal(proposal: TraderProposal) -> str:
     preserved for backward compatibility with the analyst stop-signal text
     and any external code that greps for it.
     """
+    from tradingagents.agents.utils.confidence import confidence_label
+    score = proposal.confidence_score
     parts = [
         f"**Action**: {proposal.action.value}",
+        f"**Confidence**: {score}% ({confidence_label(score)})",
         "",
         f"**Reasoning**: {proposal.reasoning}",
     ]
@@ -158,7 +172,7 @@ def render_trader_proposal(proposal: TraderProposal) -> str:
         parts.extend(["", f"**Position Sizing**: {proposal.position_sizing}"])
     parts.extend([
         "",
-        f"FINAL TRANSACTION PROPOSAL: **{proposal.action.value.upper()}**",
+        f"FINAL TRANSACTION PROPOSAL: **{proposal.action.value.upper()}** — Confidence: {score}%",
     ])
     return "\n".join(parts)
 
@@ -186,7 +200,8 @@ class PortfolioDecision(BaseModel):
     executive_summary: str = Field(
         description=(
             "A concise action plan covering entry strategy, position sizing, "
-            "key risk levels, and time horizon. Two to four sentences."
+            "key risk levels, and time horizon. Two to four sentences. "
+            "State only validated conclusions — do not expose internal uncertainty."
         ),
     )
     investment_thesis: str = Field(
@@ -194,6 +209,16 @@ class PortfolioDecision(BaseModel):
             "Detailed reasoning anchored in specific evidence from the analysts' "
             "debate. If prior lessons are referenced in the prompt context, "
             "incorporate them; otherwise rely solely on the current analysis."
+        ),
+    )
+    confidence_score: int = Field(
+        default=50,
+        ge=0,
+        le=100,
+        description=(
+            "Integer 0-100 final confidence in the portfolio rating. "
+            "80-100: High conviction, 60-79: Moderate, 40-59: Weak, <40: Uncertain. "
+            "Reduce score for data anomalies, conflicting signals, or thin evidence."
         ),
     )
     price_target: Optional[float] = Field(
@@ -214,8 +239,11 @@ def render_pm_decision(decision: PortfolioDecision) -> str:
     ``**Executive Summary**``, ``**Investment Thesis**``) that downstream
     parsers and the report writers already handle.
     """
+    from tradingagents.agents.utils.confidence import confidence_label
+    score = decision.confidence_score
     parts = [
         f"**Rating**: {decision.rating.value}",
+        f"**Confidence**: {score}% ({confidence_label(score)})",
         "",
         f"**Executive Summary**: {decision.executive_summary}",
         "",

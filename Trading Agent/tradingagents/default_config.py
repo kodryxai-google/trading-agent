@@ -11,6 +11,9 @@ DEFAULT_CONFIG = {
     # the oldest resolved entries are pruned once this limit is exceeded.
     # Pending entries are never pruned. None disables rotation entirely.
     "memory_log_max_entries": None,
+    # Storage layer paths
+    "db_path": os.getenv("TRADINGAGENTS_DB_PATH", os.path.join(_TRADINGAGENTS_HOME, "data", "trading.duckdb")),
+    "obsidian_vault_path": os.getenv("TRADINGAGENTS_OBSIDIAN_PATH", r"C:\Vibe Code\Obsidian\KODRYXAI\Trading Intelligence"),
     # LLM settings
     "llm_provider": "openai",
     "deep_think_llm": "gpt-5.4",

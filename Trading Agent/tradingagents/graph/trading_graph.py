@@ -261,7 +261,7 @@ class TradingAgentsGraph:
         if updates:
             self.memory_log.batch_update_with_outcomes(updates)
 
-    def propagate(self, company_name, trade_date):
+    def propagate(self, company_name, trade_date, progress=None):
         """Run the trading agents graph for a company on a specific date.
 
         When ``checkpoint_enabled`` is set in config, the graph is recompiled
@@ -292,14 +292,14 @@ class TradingAgentsGraph:
                 logger.info("Starting fresh for %s on %s", company_name, trade_date)
 
         try:
-            return self._run_graph(company_name, trade_date)
+            return self._run_graph(company_name, trade_date, progress=progress)
         finally:
             if self._checkpointer_ctx is not None:
                 self._checkpointer_ctx.__exit__(None, None, None)
                 self._checkpointer_ctx = None
                 self.graph = self.workflow.compile()
 
-    def _run_graph(self, company_name, trade_date):
+    def _run_graph(self, company_name, trade_date, progress=None):
         """Execute the graph and write the resulting state to disk and memory log."""
         # Initialize state — inject memory log context for PM.
         past_context = self.memory_log.get_past_context(company_name)
@@ -313,17 +313,29 @@ class TradingAgentsGraph:
             tid = thread_id(company_name, str(trade_date))
             args.setdefault("config", {}).setdefault("configurable", {})["thread_id"] = tid
 
-        if self.debug:
-            trace = []
-            for chunk in self.graph.stream(init_agent_state, **args):
-                if len(chunk["messages"]) == 0:
-                    pass
-                else:
-                    chunk["messages"][-1].pretty_print()
-                    trace.append(chunk)
-            final_state = trace[-1]
-        else:
-            final_state = self.graph.invoke(init_agent_state, **args)
+        # Always stream so we can emit progress events.
+        trace = []
+        for chunk in self.graph.stream(init_agent_state, **args):
+            node_name = next(iter(chunk.keys()), "")
+            msgs = chunk.get(node_name, {}).get("messages", []) if isinstance(chunk.get(node_name), dict) else chunk.get("messages", [])
+
+            # Progress events
+            if progress and node_name:
+                snippet = ""
+                if msgs:
+                    last = msgs[-1]
+                    snippet = getattr(last, "content", "") or ""
+                progress.emit_done(node_name, snippet=snippet)
+
+            if self.debug and msgs:
+                try:
+                    msgs[-1].pretty_print()
+                except (UnicodeEncodeError, AttributeError):
+                    content = getattr(msgs[-1], "content", "")
+                    print(content.encode("ascii", errors="replace").decode("ascii"))
+            trace.append(chunk)
+
+        final_state = trace[-1]
 
         # Store current state for reflection.
         self.curr_state = final_state
